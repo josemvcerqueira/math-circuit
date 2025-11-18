@@ -31,14 +31,14 @@ fun init(ctx: &mut TxContext) {
 
 // === Mutative Functions ===
 
-public fun transact(self: &mut Vortex, proof_points: vector<u8>, ctx: &mut TxContext) {
-    let recipient_field = bcs::to_bytes(&(ctx.sender().to_u256() / BN254_FIELD_MODULUS));
+public fun transact(self: &mut Vortex, proof_points: vector<u8>, result: u256, _ctx: &mut TxContext) {
+    let result_field = bcs::to_bytes(&(result / BN254_FIELD_MODULUS));
     assert!(
         self
             .curve
             .verify_groth16_proof(
                 &self.vk,
-                &groth16::public_proof_inputs_from_bytes(recipient_field),
+                &groth16::public_proof_inputs_from_bytes(result_field),
                 &groth16::proof_points_from_bytes(proof_points),
             ),
         0,

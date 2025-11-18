@@ -1,9 +1,4 @@
-use crate::{
-    circuit::TransactionCircuit,
-    constants::MERKLE_TREE_LEVEL,
-    merkle_tree::Path,
-    poseidon::{poseidon_bn254, PoseidonHash},
-};
+use crate::circuit::Circuit;
 use ark_bn254::{Bn254, Fr};
 use ark_crypto_primitives::snark::SNARK;
 use ark_groth16::Groth16;
@@ -41,56 +36,13 @@ pub struct ProofOutput {
 #[serde(rename_all = "camelCase")]
 pub struct ProofInput {
     // Public inputs
-    pub root: String,
-    pub public_amount: String,
-    pub ext_data_hash: String,
-    pub input_nullifier_0: String,
-    pub input_nullifier_1: String,
-    pub output_commitment_0: String,
-    pub output_commitment_1: String,
+    pub c: String,
 
-    // Private inputs - Input UTXOs
-    pub in_private_key_0: String,
-    pub in_private_key_1: String,
-    pub in_amount_0: String,
-    pub in_amount_1: String,
-    pub in_blinding_0: String,
-    pub in_blinding_1: String,
-    pub in_path_index_0: String,
-    pub in_path_index_1: String,
-
-    // Merkle paths (array of [left, right] pairs for each level)
-    pub merkle_path_0: Vec<[String; 2]>,
-    pub merkle_path_1: Vec<[String; 2]>,
-
-    // Private inputs - Output UTXOs
-    pub out_public_key_0: String,
-    pub out_public_key_1: String,
-    pub out_amount_0: String,
-    pub out_amount_1: String,
-    pub out_blinding_0: String,
-    pub out_blinding_1: String,
+    // Private inputs
+    pub a: String,
+    pub b: String,
 }
 
-/// Generates a zero-knowledge proof for a privacy-preserving transaction
-///
-/// # Arguments
-/// * `input_json` - JSON string containing all circuit inputs
-/// * `proving_key_hex` - Hex-encoded proving key (generated during setup)
-///
-/// # Returns
-/// JSON string containing the proof and public inputs
-///
-/// # Example
-/// ```javascript
-/// const input = {
-///   root: "12345...",
-///   publicAmount: "1000",
-///   // ... other inputs
-/// };
-/// const proof = prove(JSON.stringify(input), provingKeyHex);
-/// const { proofA, proofB, proofC, publicInputs } = JSON.parse(proof);
-/// ```
 #[wasm_bindgen]
 pub fn prove(input_json: &str, proving_key_hex: &str) -> Result<String, JsValue> {
     // Parse input
@@ -105,80 +57,12 @@ pub fn prove(input_json: &str, proving_key_hex: &str) -> Result<String, JsValue>
         .map_err(|e| JsValue::from_str(&format!("Failed to deserialize proving key: {}", e)))?;
 
     // Convert input strings to field elements
-    let root = parse_field_element(&input.root)?;
-    let public_amount = parse_field_element(&input.public_amount)?;
-    let ext_data_hash = parse_field_element(&input.ext_data_hash)?;
+    let c = parse_field_element(&input.c)?;
+    let a = parse_field_element(&input.a)?;
+    let b = parse_field_element(&input.b)?;
 
-    let input_nullifier_0 = parse_field_element(&input.input_nullifier_0)?;
-    let input_nullifier_1 = parse_field_element(&input.input_nullifier_1)?;
-
-    let output_commitment_0 = parse_field_element(&input.output_commitment_0)?;
-    let output_commitment_1 = parse_field_element(&input.output_commitment_1)?;
-
-    let in_private_keys = [
-        parse_field_element(&input.in_private_key_0)?,
-        parse_field_element(&input.in_private_key_1)?,
-    ];
-
-    let in_amounts = [
-        parse_field_element(&input.in_amount_0)?,
-        parse_field_element(&input.in_amount_1)?,
-    ];
-
-    let in_blindings = [
-        parse_field_element(&input.in_blinding_0)?,
-        parse_field_element(&input.in_blinding_1)?,
-    ];
-
-    let in_path_indices = [
-        parse_field_element(&input.in_path_index_0)?,
-        parse_field_element(&input.in_path_index_1)?,
-    ];
-
-    // Parse Merkle paths
-    let merkle_paths = [
-        parse_merkle_path(&input.merkle_path_0)?,
-        parse_merkle_path(&input.merkle_path_1)?,
-    ];
-
-    let out_public_keys = [
-        parse_field_element(&input.out_public_key_0)?,
-        parse_field_element(&input.out_public_key_1)?,
-    ];
-
-    let out_amounts = [
-        parse_field_element(&input.out_amount_0)?,
-        parse_field_element(&input.out_amount_1)?,
-    ];
-
-    let out_blindings = [
-        parse_field_element(&input.out_blinding_0)?,
-        parse_field_element(&input.out_blinding_1)?,
-    ];
-
-    // Create circuit
-    let poseidon_config = poseidon_bn254();
-    let hasher = PoseidonHash::new(poseidon_config);
-
-    let circuit = TransactionCircuit::new(
-        hasher,
-        root,
-        public_amount,
-        ext_data_hash,
-        input_nullifier_0,
-        input_nullifier_1,
-        output_commitment_0,
-        output_commitment_1,
-        in_private_keys,
-        in_amounts,
-        in_blindings,
-        in_path_indices,
-        merkle_paths,
-        out_public_keys,
-        out_amounts,
-        out_blindings,
-    )
-    .map_err(|e| JsValue::from_str(&format!("Failed to create circuit: {}", e)))?;
+    let circuit = Circuit::new(c, a, b)
+        .map_err(|e| JsValue::from_str(&format!("Failed to create circuit: {}", e)))?;
 
     // Generate proof using deterministic RNG for testing
     // In production, you should use a secure RNG
@@ -309,24 +193,4 @@ fn parse_field_element(s: &str) -> Result<Fr, JsValue> {
     let big_uint = BigUint::from_str(s)
         .map_err(|e| JsValue::from_str(&format!("Failed to parse decimal '{}': {}", s, e)))?;
     Ok(Fr::from(big_uint))
-}
-
-fn parse_merkle_path(path_data: &[[String; 2]]) -> Result<Path<MERKLE_TREE_LEVEL>, JsValue> {
-    if path_data.len() != MERKLE_TREE_LEVEL {
-        return Err(JsValue::from_str(&format!(
-            "Invalid Merkle path length: expected {}, got {}",
-            MERKLE_TREE_LEVEL,
-            path_data.len()
-        )));
-    }
-
-    let mut path = [(Fr::from(0u64), Fr::from(0u64)); MERKLE_TREE_LEVEL];
-
-    for (i, pair) in path_data.iter().enumerate() {
-        let left = parse_field_element(&pair[0])?;
-        let right = parse_field_element(&pair[1])?;
-        path[i] = (left, right);
-    }
-
-    Ok(Path { path })
 }
