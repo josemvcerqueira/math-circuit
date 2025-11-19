@@ -63,8 +63,8 @@ impl ConstraintSynthesizer<Fr> for Circuit {
         let c = FpVar::new_input(ns!(cs, "c"), || Ok(self.c))?;
 
         // Private inputs
-        let a = FpVar::new_input(ns!(cs, "a"), || Ok(self.a))?;
-        let b = FpVar::new_input(ns!(cs, "b"), || Ok(self.b))?;
+        let a = FpVar::new_witness(ns!(cs, "a"), || Ok(self.a))?;
+        let b = FpVar::new_witness(ns!(cs, "b"), || Ok(self.b))?;
 
         c.enforce_equal(&(a * b))?;
 

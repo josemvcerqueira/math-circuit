@@ -2,9 +2,8 @@
   "name": "vortex-scripts",
   "version": "1.0.0",
   "description": "Key generation scripts for Vortex privacy protocol",
-  "type": "module",
   "scripts": {
-    "new": "tsx src/new.ts"
+    "transact": "tsx src/transact.ts"
   },
   "keywords": [
     "zksnark",

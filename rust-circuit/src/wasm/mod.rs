@@ -50,11 +50,7 @@ pub fn prove(input_json: &str, proving_key_hex: &str) -> Result<String, JsValue>
         .map_err(|e| JsValue::from_str(&format!("Failed to parse input JSON: {}", e)))?;
 
     // Parse proving key
-    let pk_bytes = hex::decode(proving_key_hex)
-        .map_err(|e| JsValue::from_str(&format!("Failed to decode proving key hex: {}", e)))?;
-
-    let pk = ark_groth16::ProvingKey::<Bn254>::deserialize_compressed(&pk_bytes[..])
-        .map_err(|e| JsValue::from_str(&format!("Failed to deserialize proving key: {}", e)))?;
+    let pk = deserialize_proving_key(proving_key_hex)?;
 
     // Convert input strings to field elements
     let c = parse_field_element(&input.c)?;
@@ -132,14 +128,6 @@ pub fn prove(input_json: &str, proving_key_hex: &str) -> Result<String, JsValue>
         .map_err(|e| JsValue::from_str(&format!("Failed to serialize output: {}", e)))
 }
 
-/// Verifies a proof (useful for testing before submitting to chain)
-///
-/// # Arguments
-/// * `proof_json` - JSON string containing proof output from `prove()`
-/// * `verifying_key_hex` - Hex-encoded verifying key
-///
-/// # Returns
-/// "true" if proof is valid, "false" otherwise
 #[wasm_bindgen]
 pub fn verify(proof_json: &str, verifying_key_hex: &str) -> Result<String, JsValue> {
     // Parse proof output
@@ -185,7 +173,18 @@ pub fn verify(proof_json: &str, verifying_key_hex: &str) -> Result<String, JsVal
     Ok(is_valid.to_string())
 }
 
-// Helper functions
+fn deserialize_proving_key(
+    proving_key_hex: &str,
+) -> Result<ark_groth16::ProvingKey<Bn254>, JsValue> {
+    let pk_bytes = hex::decode(proving_key_hex)
+        .map_err(|e| JsValue::from_str(&format!("Failed to decode proving key hex: {}", e)))?;
+
+    let pk = ark_groth16::ProvingKey::<Bn254>::deserialize_compressed(&pk_bytes[..])
+        .map_err(|e| JsValue::from_str(&format!("Failed to deserialize proving key: {}", e)))?;
+
+    Ok(pk)
+}
+
 fn parse_field_element(s: &str) -> Result<Fr, JsValue> {
     // Handle both decimal and hex strings
     let s = s.trim();
